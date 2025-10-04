@@ -239,3 +239,4 @@ def create_review(project_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
