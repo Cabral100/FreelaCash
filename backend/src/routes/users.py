@@ -30,20 +30,40 @@ def get_users():
 
 @users_bp.route('/<user_id>', methods=['GET'])
 def get_user(user_id):
-    """Get user by ID"""
+    """Get user by ID with detailed information"""
     try:
         user = User.query.get(user_id)
-        
+
         if not user:
             return jsonify({'error': 'Usuário não encontrado'}), 404
-        
-        # Calcular estatísticas
+
         total_projects = len(user.projects_as_client) if user.user_type == 'client' else len(user.projects_as_freelancer)
-        
-        # Calcular média de avaliações
-        reviews = Review.query.filter_by(reviewed_id=user_id).all()
+
+        reviews = Review.query.filter_by(reviewed_id=user_id).order_by(Review.created_at.desc()).all()
         avg_rating = sum([r.rating for r in reviews]) / len(reviews) if reviews else 0
-        
+
+        recent_reviews = []
+        for review in reviews[:5]:
+            review_data = review.to_dict()
+            reviewer = User.query.get(review.reviewer_id)
+            project = review.project
+            if reviewer:
+                review_data['reviewer_name'] = reviewer.name
+            if project:
+                review_data['project_title'] = project.title
+            recent_reviews.append(review_data)
+
+        completed_projects = []
+        if user.user_type == 'freelancer':
+            completed = [p for p in user.projects_as_freelancer if p.status == 'completed']
+            for project in completed[:5]:
+                completed_projects.append({
+                    'project_id': project.project_id,
+                    'title': project.title,
+                    'amount': project.amount,
+                    'completed_at': project.completed_at.isoformat() if project.completed_at else None
+                })
+
         return jsonify({
             'user': user.to_dict(),
             'wallet': user.wallet.to_dict() if user.wallet else None,
@@ -51,9 +71,11 @@ def get_user(user_id):
                 'total_projects': total_projects,
                 'average_rating': round(avg_rating, 2),
                 'total_reviews': len(reviews)
-            }
+            },
+            'recent_reviews': recent_reviews,
+            'completed_projects': completed_projects
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

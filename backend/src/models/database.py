@@ -19,6 +19,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     user_type = db.Column(db.String(20), nullable=False)  # 'freelancer' or 'client'
     reputation_score = db.Column(db.Float, default=0.0)
+    bio = db.Column(db.Text)
     profile_image = db.Column(db.String(500))
     phone = db.Column(db.String(20))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -28,6 +29,7 @@ class User(db.Model):
     wallet = db.relationship('Wallet', backref='user', uselist=False, cascade='all, delete-orphan')
     projects_as_client = db.relationship('Project', foreign_keys='Project.client_id', backref='client')
     projects_as_freelancer = db.relationship('Project', foreign_keys='Project.freelancer_id', backref='freelancer')
+    applications = db.relationship('Application', foreign_keys='Application.freelancer_id', backref='freelancer_apps', cascade='all, delete-orphan')
     
     def to_dict(self):
         return {
@@ -36,6 +38,7 @@ class User(db.Model):
             'email': self.email,
             'user_type': self.user_type,
             'reputation_score': self.reputation_score,
+            'bio': self.bio,
             'profile_image': self.profile_image,
             'phone': self.phone,
             'created_at': self.created_at.isoformat() if self.created_at else None
@@ -87,6 +90,7 @@ class Project(db.Model):
     # Relationships
     transactions = db.relationship('Transaction', backref='project', cascade='all, delete-orphan')
     reviews = db.relationship('Review', backref='project', cascade='all, delete-orphan')
+    applications = db.relationship('Application', backref='project', cascade='all, delete-orphan')
     
     def to_dict(self):
         return {
@@ -185,4 +189,31 @@ class Dispute(db.Model):
             'resolution': self.resolution,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None
+        }
+
+class Application(db.Model):
+    __tablename__ = 'applications'
+
+    application_id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    project_id = db.Column(db.String(36), db.ForeignKey('projects.project_id'), nullable=False)
+    freelancer_id = db.Column(db.String(36), db.ForeignKey('users.user_id'), nullable=False)
+    proposed_amount = db.Column(db.Float, nullable=False)
+    cover_letter = db.Column(db.Text)
+    status = db.Column(db.String(20), default='pending')  # pending, accepted, rejected
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    freelancer = db.relationship('User', foreign_keys=[freelancer_id])
+
+    def to_dict(self):
+        return {
+            'application_id': self.application_id,
+            'project_id': self.project_id,
+            'freelancer_id': self.freelancer_id,
+            'freelancer_name': self.freelancer.name if self.freelancer else None,
+            'freelancer_reputation': self.freelancer.reputation_score if self.freelancer else 0,
+            'proposed_amount': self.proposed_amount,
+            'cover_letter': self.cover_letter,
+            'status': self.status,
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }

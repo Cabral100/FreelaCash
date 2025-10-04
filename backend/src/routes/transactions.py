@@ -101,37 +101,34 @@ def release_payment(project_id):
     try:
         user_id = get_jwt_identity()
         user = User.query.get(user_id)
-        
+
         project = Project.query.get(project_id)
-        
+
         if not project:
             return jsonify({'error': 'Projeto não encontrado'}), 404
-        
+
         if project.client_id != user_id:
             return jsonify({'error': 'Apenas o cliente pode liberar o pagamento'}), 403
-        
+
         if project.status not in ['delivered', 'funded', 'in_progress']:
             return jsonify({'error': 'Projeto não está pronto para liberação de pagamento'}), 400
-        
+
         if not project.freelancer_id:
             return jsonify({'error': 'Projeto não possui freelancer atribuído'}), 400
-        
+
         freelancer = User.query.get(project.freelancer_id)
-        
+
         if not freelancer or not freelancer.wallet:
             return jsonify({'error': 'Carteira do freelancer não encontrada'}), 404
-        
-        # Buscar carteira de escrow
+
         escrow = EscrowWallet.query.first()
-        
+
         if not escrow or escrow.balance < project.amount:
             return jsonify({'error': 'Fundos não disponíveis em custódia'}), 500
-        
-        # Transferir fundos do escrow para freelancer
+
         escrow.balance -= project.amount
         freelancer.wallet.balance += project.amount
-        
-        # Criar transação
+
         transaction = Transaction(
             escrow_wallet_id=escrow.wallet_id,
             destination_wallet_id=freelancer.wallet.wallet_id,
@@ -141,23 +138,23 @@ def release_payment(project_id):
             status='completed',
             description=f'Liberação de pagamento do projeto: {project.title}'
         )
-        
+
         db.session.add(transaction)
-        
-        # Atualizar status do projeto
-        project.status = 'completed'
-        
+
+        project.status = 'awaiting_review'
+
         from datetime import datetime
         project.completed_at = datetime.utcnow()
-        
+
         db.session.commit()
-        
+
         return jsonify({
-            'message': 'Pagamento liberado com sucesso',
+            'message': 'Pagamento liberado com sucesso. Por favor, avalie o freelancer para concluir o projeto.',
             'project': project.to_dict(),
-            'transaction': transaction.to_dict()
+            'transaction': transaction.to_dict(),
+            'requires_review': True
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

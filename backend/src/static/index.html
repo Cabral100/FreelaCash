@@ -270,6 +270,76 @@
         </div>
     </div>
 
+    <!-- Freelancer Details Modal -->
+    <div id="freelancerDetailsModal" class="modal">
+        <div class="modal-content modal-large">
+            <div id="freelancerDetails"></div>
+        </div>
+    </div>
+
+    <!-- Apply to Project Modal -->
+    <div id="applyProjectModal" class="modal">
+        <div class="modal-content">
+            <h3>Candidatar-se ao Projeto</h3>
+            <form id="applyProjectForm" onsubmit="handleApplyToProject(event)">
+                <input type="hidden" id="applyProjectId" name="project_id">
+                <div class="form-group">
+                    <label>Valor Proposto (R$)</label>
+                    <input type="number" name="proposed_amount" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Carta de Apresentação</label>
+                    <textarea name="cover_letter" rows="4" placeholder="Descreva por que você é a melhor escolha para este projeto"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Enviar Candidatura</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Project Applications Modal -->
+    <div id="applicationsModal" class="modal">
+        <div class="modal-content modal-large">
+            <h3>Candidaturas</h3>
+            <div id="applicationsList"></div>
+        </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div id="reviewModal" class="modal">
+        <div class="modal-content">
+            <h3>Avaliar Freelancer</h3>
+            <form id="reviewForm" onsubmit="handleCreateReview(event)">
+                <input type="hidden" id="reviewProjectId" name="project_id">
+                <div class="form-group">
+                    <label>Avaliação (1-5 estrelas)</label>
+                    <div class="star-rating">
+                        <input type="radio" name="rating" value="5" id="star5" required>
+                        <label for="star5">⭐⭐⭐⭐⭐</label>
+                        <input type="radio" name="rating" value="4" id="star4">
+                        <label for="star4">⭐⭐⭐⭐</label>
+                        <input type="radio" name="rating" value="3" id="star3">
+                        <label for="star3">⭐⭐⭐</label>
+                        <input type="radio" name="rating" value="2" id="star2">
+                        <label for="star2">⭐⭐</label>
+                        <input type="radio" name="rating" value="1" id="star1">
+                        <label for="star1">⭐</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Comentário</label>
+                    <textarea name="comment" rows="4" placeholder="Descreva sua experiência com o freelancer"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Enviar Avaliação</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

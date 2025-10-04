@@ -315,23 +315,26 @@ function displayProjectDetailsModal(project) {
     const modal = document.getElementById('projectDetailsModal');
     const title = document.getElementById('projectTitle');
     const details = document.getElementById('projectDetails');
-    
+
     title.textContent = project.title;
-    
+
     let actionsHTML = '';
-    
-    // Actions based on user role and project status
+
     if (state.user) {
         if (state.user.user_type === 'freelancer' && project.status === 'open' && !project.freelancer_id) {
-            actionsHTML = `<button class="btn-primary" onclick="assignProject('${project.project_id}')">Candidatar-se</button>`;
+            actionsHTML = `<button class="btn-primary" onclick="showApplyModal('${project.project_id}')">Candidatar-se</button>`;
         } else if (state.user.user_id === project.client_id) {
-            if (project.status === 'assigned') {
+            if (project.status === 'open') {
+                actionsHTML = `<button class="btn-primary" onclick="viewApplications('${project.project_id}')">Ver Candidaturas</button>`;
+            } else if (project.status === 'assigned') {
                 actionsHTML = `<button class="btn-primary" onclick="fundProject('${project.project_id}')">Financiar Projeto</button>`;
             } else if (project.status === 'delivered' || project.status === 'funded' || project.status === 'in_progress') {
                 actionsHTML = `
                     <button class="btn-primary" onclick="releasePayment('${project.project_id}')">Liberar Pagamento</button>
                     <button class="btn-secondary" onclick="refundProject('${project.project_id}')">Solicitar Reembolso</button>
                 `;
+            } else if (project.status === 'awaiting_review') {
+                actionsHTML = `<button class="btn-primary" onclick="showReviewModal('${project.project_id}')">Avaliar Freelancer</button>`;
             }
         } else if (state.user.user_id === project.freelancer_id) {
             if (project.status === 'funded' || project.status === 'in_progress') {
@@ -339,7 +342,7 @@ function displayProjectDetailsModal(project) {
             }
         }
     }
-    
+
     details.innerHTML = `
         <div class="project-details">
             <p><strong>Status:</strong> <span class="project-status status-${project.status}">${getStatusLabel(project.status)}</span></p>
@@ -355,7 +358,7 @@ function displayProjectDetailsModal(project) {
             </div>
         </div>
     `;
-    
+
     showModal('projectDetailsModal');
 }
 
@@ -411,10 +414,10 @@ async function fundProject(projectId) {
 }
 
 async function releasePayment(projectId) {
-    if (!confirm('Deseja liberar o pagamento para o freelancer? Esta ação não pode ser desfeita.')) {
+    if (!confirm('Deseja liberar o pagamento para o freelancer? Após isso, você será obrigado a avaliar o freelancer.')) {
         return;
     }
-    
+
     try {
         const response = await fetch(`${API_URL}/transactions/release-payment/${projectId}`, {
             method: 'POST',
@@ -422,12 +425,20 @@ async function releasePayment(projectId) {
                 'Authorization': `Bearer ${state.token}`
             }
         });
-        
+
         const data = await response.json();
-        
+
         if (response.ok) {
-            showNotification('Pagamento liberado com sucesso!', 'success');
-            closeModal();
+            if (data.requires_review) {
+                closeModal();
+                showNotification(data.message || 'Pagamento liberado! Por favor, avalie o freelancer.', 'success');
+                setTimeout(() => {
+                    showReviewModal(projectId);
+                }, 1000);
+            } else {
+                showNotification('Pagamento liberado com sucesso!', 'success');
+                closeModal();
+            }
             loadProjects(state.currentFilter);
             loadUserData();
         } else {
@@ -547,14 +558,14 @@ async function loadFreelancers() {
 
 function displayFreelancers(freelancers) {
     const freelancersList = document.getElementById('freelancersList');
-    
+
     if (freelancers.length === 0) {
         freelancersList.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">Nenhum freelancer encontrado</p>';
         return;
     }
-    
+
     freelancersList.innerHTML = freelancers.map(freelancer => `
-        <div class="freelancer-card">
+        <div class="freelancer-card" onclick="showFreelancerDetails('${freelancer.user_id}')" style="cursor: pointer;">
             <h3 class="freelancer-name">${freelancer.name}</h3>
             <div class="freelancer-rating">⭐ ${freelancer.average_rating.toFixed(1)}</div>
             <p style="color: var(--text-secondary);">${freelancer.email}</p>
@@ -574,6 +585,87 @@ function displayFreelancers(freelancers) {
             </div>
         </div>
     `).join('');
+}
+
+async function showFreelancerDetails(freelancerId) {
+    try {
+        const response = await fetch(`${API_URL}/users/${freelancerId}`);
+
+        if (response.ok) {
+            const data = await response.json();
+            displayFreelancerDetailsModal(data);
+        } else {
+            showNotification('Erro ao carregar detalhes do freelancer', 'error');
+        }
+    } catch (error) {
+        showNotification('Erro ao conectar com o servidor', 'error');
+    }
+}
+
+function displayFreelancerDetailsModal(data) {
+    const modal = document.getElementById('freelancerDetailsModal');
+    const details = document.getElementById('freelancerDetails');
+
+    const user = data.user;
+    const stats = data.statistics;
+    const reviews = data.recent_reviews || [];
+    const projects = data.completed_projects || [];
+
+    let reviewsHTML = reviews.length > 0
+        ? reviews.map(review => `
+            <div style="padding: 15px; background: var(--card-bg); border-radius: 8px; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <strong>${review.reviewer_name || 'Cliente'}</strong>
+                    <span>⭐ ${review.rating.toFixed(1)}</span>
+                </div>
+                <p style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 8px;">${review.project_title || ''}</p>
+                <p>${review.comment || 'Sem comentários'}</p>
+                <p style="color: var(--text-secondary); font-size: 0.8em; margin-top: 8px;">${formatDate(review.created_at)}</p>
+            </div>
+        `).join('')
+        : '<p style="color: var(--text-secondary);">Nenhuma avaliação ainda</p>';
+
+    details.innerHTML = `
+        <div style="margin-bottom: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+                <div>
+                    <h2 style="margin: 0 0 10px 0;">${user.name}</h2>
+                    <p style="color: var(--text-secondary); margin: 0;">${user.email}</p>
+                    ${user.bio ? `<p style="margin-top: 15px; line-height: 1.6;">${user.bio}</p>` : ''}
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 2em;">⭐ ${stats.average_rating.toFixed(1)}</div>
+                    <div style="color: var(--text-secondary);">${stats.total_reviews} avaliações</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px;">
+                <div style="text-align: center; padding: 15px; background: var(--card-bg); border-radius: 8px;">
+                    <div style="font-size: 2em; font-weight: bold; color: var(--primary-color);">${stats.total_projects}</div>
+                    <div style="color: var(--text-secondary);">Projetos Completados</div>
+                </div>
+                <div style="text-align: center; padding: 15px; background: var(--card-bg); border-radius: 8px;">
+                    <div style="font-size: 2em; font-weight: bold; color: var(--primary-color);">⭐${stats.average_rating.toFixed(1)}</div>
+                    <div style="color: var(--text-secondary);">Avaliação Média</div>
+                </div>
+                <div style="text-align: center; padding: 15px; background: var(--card-bg); border-radius: 8px;">
+                    <div style="font-size: 2em; font-weight: bold; color: var(--primary-color);">${user.reputation_score.toFixed(1)}</div>
+                    <div style="color: var(--text-secondary);">Reputação</div>
+                </div>
+            </div>
+
+            <h3 style="margin-bottom: 15px;">Avaliações Recentes</h3>
+            <div style="max-height: 400px; overflow-y: auto;">
+                ${reviewsHTML}
+            </div>
+
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn-secondary" onclick="closeModal()">Fechar</button>
+            </div>
+        </div>
+    `;
+
+    showModal('freelancerDetailsModal');
 }
 
 // Dashboard
@@ -770,6 +862,7 @@ function getStatusLabel(status) {
         'in_progress': 'Em Andamento',
         'delivered': 'Entregue',
         'completed': 'Concluído',
+        'awaiting_review': 'Aguardando Avaliação',
         'disputed': 'Em Disputa',
         'cancelled': 'Cancelado'
     };
@@ -788,6 +881,200 @@ function getTransactionTypeLabel(type) {
 }
 
 function showNotification(message, type = 'info') {
-    // Simple alert for now - can be enhanced with a toast notification system
     alert(message);
+}
+
+function showApplyModal(projectId) {
+    document.getElementById('applyProjectId').value = projectId;
+    closeModal();
+    showModal('applyProjectModal');
+}
+
+async function handleApplyToProject(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    const projectId = formData.get('project_id');
+
+    try {
+        const response = await fetch(`${API_URL}/projects/${projectId}/apply`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${state.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                proposed_amount: parseFloat(formData.get('proposed_amount')),
+                cover_letter: formData.get('cover_letter')
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showNotification('Candidatura enviada com sucesso!', 'success');
+            closeModal();
+            form.reset();
+            loadProjects(state.currentFilter);
+        } else {
+            showNotification(data.error || 'Erro ao enviar candidatura', 'error');
+        }
+    } catch (error) {
+        showNotification('Erro ao conectar com o servidor', 'error');
+    }
+}
+
+async function viewApplications(projectId) {
+    try {
+        const response = await fetch(`${API_URL}/projects/${projectId}/applications`, {
+            headers: {
+                'Authorization': `Bearer ${state.token}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            displayApplicationsModal(projectId, data.applications);
+        } else {
+            showNotification(data.error || 'Erro ao carregar candidaturas', 'error');
+        }
+    } catch (error) {
+        showNotification('Erro ao conectar com o servidor', 'error');
+    }
+}
+
+function displayApplicationsModal(projectId, applications) {
+    const modal = document.getElementById('applicationsModal');
+    const list = document.getElementById('applicationsList');
+
+    if (applications.length === 0) {
+        list.innerHTML = `
+            <p style="text-align: center; color: var(--text-secondary); padding: 40px;">
+                Nenhuma candidatura ainda
+            </p>
+            <div style="text-align: center;">
+                <button class="btn-secondary" onclick="closeModal()">Fechar</button>
+            </div>
+        `;
+    } else {
+        list.innerHTML = `
+            <div style="margin-bottom: 20px;">
+                ${applications.map(app => `
+                    <div style="padding: 20px; background: var(--card-bg); border-radius: 8px; margin-bottom: 15px; ${app.status === 'accepted' ? 'border: 2px solid var(--success);' : ''}">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                            <div>
+                                <h4 style="margin: 0 0 5px 0;">${app.freelancer_name}</h4>
+                                <div style="color: var(--text-secondary); font-size: 0.9em;">
+                                    ⭐ ${app.freelancer_average_rating?.toFixed(1) || '0.0'}
+                                    (${app.freelancer_total_reviews || 0} avaliações) •
+                                    ${app.freelancer_total_projects || 0} projetos
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 1.5em; font-weight: bold; color: var(--primary-color);">
+                                    ${formatCurrency(app.proposed_amount)}
+                                </div>
+                                <span class="project-status status-${app.status}">${app.status === 'pending' ? 'Pendente' : app.status === 'accepted' ? 'Aceito' : 'Rejeitado'}</span>
+                            </div>
+                        </div>
+                        ${app.cover_letter ? `
+                            <div style="margin-bottom: 15px;">
+                                <strong>Carta de Apresentação:</strong>
+                                <p style="margin-top: 8px; line-height: 1.6;">${app.cover_letter}</p>
+                            </div>
+                        ` : ''}
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="color: var(--text-secondary); font-size: 0.85em;">
+                                Enviada em ${formatDate(app.created_at)}
+                            </div>
+                            ${app.status === 'pending' ? `
+                                <div>
+                                    <button class="btn-primary" onclick="acceptApplication('${projectId}', '${app.application_id}')" style="margin-right: 10px;">
+                                        Aceitar
+                                    </button>
+                                    <button class="btn-secondary" onclick="showFreelancerDetails('${app.freelancer_id}')">
+                                        Ver Perfil
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            <div style="text-align: center;">
+                <button class="btn-secondary" onclick="closeModal()">Fechar</button>
+            </div>
+        `;
+    }
+
+    closeModal();
+    showModal('applicationsModal');
+}
+
+async function acceptApplication(projectId, applicationId) {
+    if (!confirm('Deseja aceitar esta candidatura? Os outros candidatos serão rejeitados.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/projects/${projectId}/applications/${applicationId}/accept`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${state.token}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showNotification('Candidatura aceita com sucesso!', 'success');
+            closeModal();
+            loadProjects(state.currentFilter);
+        } else {
+            showNotification(data.error || 'Erro ao aceitar candidatura', 'error');
+        }
+    } catch (error) {
+        showNotification('Erro ao conectar com o servidor', 'error');
+    }
+}
+
+function showReviewModal(projectId) {
+    document.getElementById('reviewProjectId').value = projectId;
+    closeModal();
+    showModal('reviewModal');
+}
+
+async function handleCreateReview(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    const projectId = formData.get('project_id');
+
+    try {
+        const response = await fetch(`${API_URL}/projects/${projectId}/review`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${state.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                rating: parseFloat(formData.get('rating')),
+                comment: formData.get('comment')
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showNotification('Avaliação enviada com sucesso!', 'success');
+            closeModal();
+            form.reset();
+            loadProjects(state.currentFilter);
+        } else {
+            showNotification(data.error || 'Erro ao enviar avaliação', 'error');
+        }
+    } catch (error) {
+        showNotification('Erro ao conectar com o servidor', 'error');
+    }
 }

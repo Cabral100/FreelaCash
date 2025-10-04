@@ -4,7 +4,7 @@ Projects routes
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
-from src.models.database import db, Project, User, Review
+from src.models.database import db, Project, User, Review, Application
 
 projects_bp = Blueprint('projects', __name__)
 
@@ -98,39 +98,133 @@ def create_project():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@projects_bp.route('/<project_id>/assign', methods=['POST'])
+@projects_bp.route('/<project_id>/apply', methods=['POST'])
 @jwt_required()
-def assign_project(project_id):
-    """Assign project to a freelancer"""
+def apply_to_project(project_id):
+    """Freelancer applies to a project with proposed amount"""
     try:
         user_id = get_jwt_identity()
         user = User.query.get(user_id)
-        
+
         if user.user_type != 'freelancer':
             return jsonify({'error': 'Apenas freelancers podem se candidatar a projetos'}), 403
-        
+
         project = Project.query.get(project_id)
-        
+
         if not project:
             return jsonify({'error': 'Projeto não encontrado'}), 404
-        
+
         if project.status != 'open':
             return jsonify({'error': 'Projeto não está disponível'}), 400
-        
-        if project.freelancer_id:
-            return jsonify({'error': 'Projeto já possui um freelancer atribuído'}), 400
-        
-        # Atribuir freelancer
-        project.freelancer_id = user_id
-        project.status = 'assigned'
-        
+
+        existing_application = Application.query.filter_by(
+            project_id=project_id,
+            freelancer_id=user_id
+        ).first()
+
+        if existing_application:
+            return jsonify({'error': 'Você já se candidatou a este projeto'}), 400
+
+        data = request.get_json()
+
+        if 'proposed_amount' not in data or float(data['proposed_amount']) <= 0:
+            return jsonify({'error': 'Valor proposto é obrigatório e deve ser maior que zero'}), 400
+
+        application = Application(
+            project_id=project_id,
+            freelancer_id=user_id,
+            proposed_amount=float(data['proposed_amount']),
+            cover_letter=data.get('cover_letter'),
+            status='pending'
+        )
+
+        db.session.add(application)
         db.session.commit()
-        
+
         return jsonify({
-            'message': 'Projeto atribuído com sucesso',
+            'message': 'Candidatura enviada com sucesso',
+            'application': application.to_dict()
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@projects_bp.route('/<project_id>/applications', methods=['GET'])
+@jwt_required()
+def get_project_applications(project_id):
+    """Get all applications for a project"""
+    try:
+        user_id = get_jwt_identity()
+        project = Project.query.get(project_id)
+
+        if not project:
+            return jsonify({'error': 'Projeto não encontrado'}), 404
+
+        if project.client_id != user_id:
+            return jsonify({'error': 'Sem permissão para ver candidaturas deste projeto'}), 403
+
+        applications = Application.query.filter_by(project_id=project_id).order_by(Application.created_at.desc()).all()
+
+        result = []
+        for app in applications:
+            app_data = app.to_dict()
+            freelancer = User.query.get(app.freelancer_id)
+            if freelancer:
+                reviews = Review.query.filter_by(reviewed_id=freelancer.user_id).all()
+                avg_rating = sum([r.rating for r in reviews]) / len(reviews) if reviews else 0
+                app_data['freelancer_average_rating'] = round(avg_rating, 2)
+                app_data['freelancer_total_reviews'] = len(reviews)
+                app_data['freelancer_total_projects'] = len(freelancer.projects_as_freelancer)
+            result.append(app_data)
+
+        return jsonify({'applications': result}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@projects_bp.route('/<project_id>/applications/<application_id>/accept', methods=['POST'])
+@jwt_required()
+def accept_application(project_id, application_id):
+    """Client accepts a freelancer application"""
+    try:
+        user_id = get_jwt_identity()
+        project = Project.query.get(project_id)
+
+        if not project:
+            return jsonify({'error': 'Projeto não encontrado'}), 404
+
+        if project.client_id != user_id:
+            return jsonify({'error': 'Sem permissão para aceitar candidaturas deste projeto'}), 403
+
+        if project.status != 'open':
+            return jsonify({'error': 'Projeto não está mais aberto'}), 400
+
+        application = Application.query.get(application_id)
+
+        if not application or application.project_id != project_id:
+            return jsonify({'error': 'Candidatura não encontrada'}), 404
+
+        project.freelancer_id = application.freelancer_id
+        project.amount = application.proposed_amount
+        project.status = 'assigned'
+
+        application.status = 'accepted'
+
+        other_applications = Application.query.filter(
+            Application.project_id == project_id,
+            Application.application_id != application_id
+        ).all()
+        for other_app in other_applications:
+            other_app.status = 'rejected'
+
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Candidatura aceita com sucesso',
             'project': project.to_dict()
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -187,8 +281,8 @@ def create_review(project_id):
         if not project:
             return jsonify({'error': 'Projeto não encontrado'}), 404
         
-        if project.status != 'completed':
-            return jsonify({'error': 'Projeto precisa estar completo para ser avaliado'}), 400
+        if project.status not in ['completed', 'awaiting_review']:
+            return jsonify({'error': 'Projeto precisa estar aguardando avaliação ou completo para ser avaliado'}), 400
         
         # Verificar se usuário pode avaliar
         if project.client_id != user_id and project.freelancer_id != user_id:
@@ -223,12 +317,14 @@ def create_review(project_id):
         
         db.session.add(review)
         
-        # Atualizar score de reputação do usuário avaliado
         reviewed_user = User.query.get(reviewed_id)
         all_reviews = Review.query.filter_by(reviewed_id=reviewed_id).all()
         avg_rating = (sum([r.rating for r in all_reviews]) + float(data['rating'])) / (len(all_reviews) + 1)
         reviewed_user.reputation_score = round(avg_rating, 2)
-        
+
+        if project.status == 'awaiting_review':
+            project.status = 'completed'
+
         db.session.commit()
         
         return jsonify({
