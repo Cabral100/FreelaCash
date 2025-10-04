@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FreelaCash - Pagamentos Seguros para Freelancers</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header id="header">
+        <div class="container">
+            <div class="logo">
+                <h1>FreelaCash</h1>
+            </div>
+            <nav id="mainNav">
+                <a href="#" onclick="showPage('home')">Início</a>
+                <a href="#" onclick="showPage('projects')">Projetos</a>
+                <a href="#" onclick="showPage('freelancers')">Freelancers</a>
+                <a href="#" onclick="showPage('dashboard')">Dashboard</a>
+            </nav>
+            <div id="authButtons">
+                <button class="btn-secondary" onclick="showPage('login')">Entrar</button>
+                <button class="btn-primary" onclick="showPage('register')">Cadastrar</button>
+            </div>
+            <div id="userMenu" style="display: none;">
+                <div class="user-info">
+                    <span id="userName"></span>
+                    <span id="userBalance" class="balance"></span>
+                </div>
+                <button class="btn-secondary" onclick="logout()">Sair</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="mainContent">
+        <!-- Home Page -->
+        <section id="homePage" class="page active">
+            <div class="hero">
+                <div class="container">
+                    <h1 class="hero-title">Pagamentos Seguros para a Economia Gig</h1>
+                    <p class="hero-subtitle">Sistema de custódia que protege clientes e freelancers em todas as transações</p>
+                    <div class="hero-buttons">
+                        <button class="btn-primary btn-large" onclick="showPage('register')">Começar Agora</button>
+                        <button class="btn-secondary btn-large" onclick="showPage('projects')">Ver Projetos</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="features">
+                <div class="container">
+                    <h2>Como Funciona</h2>
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <div class="feature-icon">1</div>
+                            <h3>Acordo</h3>
+                            <p>Cliente e freelancer definem o escopo e valor do projeto</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">2</div>
+                            <h3>Depósito Seguro</h3>
+                            <p>Cliente deposita o valor na plataforma em custódia</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">3</div>
+                            <h3>Execução</h3>
+                            <p>Freelancer executa e entrega o projeto com segurança</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">4</div>
+                            <h3>Liberação</h3>
+                            <p>Cliente aprova e o pagamento é liberado instantaneamente</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Login Page -->
+        <section id="loginPage" class="page">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <h2>Entrar</h2>
+                    <form id="loginForm" onsubmit="handleLogin(event)">
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Senha</label>
+                            <input type="password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn-primary btn-block">Entrar</button>
+                    </form>
+                    <p class="auth-link">Não tem conta? <a href="#" onclick="showPage('register')">Cadastre-se</a></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Register Page -->
+        <section id="registerPage" class="page">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <h2>Cadastrar</h2>
+                    <form id="registerForm" onsubmit="handleRegister(event)">
+                        <div class="form-group">
+                            <label>Nome Completo</label>
+                            <input type="text" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Senha</label>
+                            <input type="password" name="password" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Telefone</label>
+                            <input type="tel" name="phone">
+                        </div>
+                        <div class="form-group">
+                            <label>Tipo de Conta</label>
+                            <select name="user_type" required>
+                                <option value="">Selecione...</option>
+                                <option value="client">Cliente</option>
+                                <option value="freelancer">Freelancer</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary btn-block">Cadastrar</button>
+                    </form>
+                    <p class="auth-link">Já tem conta? <a href="#" onclick="showPage('login')">Entre</a></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Projects Page -->
+        <section id="projectsPage" class="page">
+            <div class="container">
+                <div class="page-header">
+                    <h2>Projetos</h2>
+                    <button class="btn-primary" onclick="showCreateProjectModal()" id="createProjectBtn" style="display: none;">Criar Projeto</button>
+                </div>
+                <div class="filters">
+                    <button class="filter-btn active" onclick="filterProjects('all')">Todos</button>
+                    <button class="filter-btn" onclick="filterProjects('available')">Disponíveis</button>
+                    <button class="filter-btn" onclick="filterProjects('my_projects')">Meus Projetos</button>
+                </div>
+                <div id="projectsList" class="projects-grid"></div>
+            </div>
+        </section>
+
+        <!-- Freelancers Page -->
+        <section id="freelancersPage" class="page">
+            <div class="container">
+                <h2>Freelancers</h2>
+                <div id="freelancersList" class="freelancers-grid"></div>
+            </div>
+        </section>
+
+        <!-- Dashboard Page -->
+        <section id="dashboardPage" class="page">
+            <div class="container">
+                <h2>Dashboard</h2>
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <h3>Minha Carteira</h3>
+                        <div class="wallet-info">
+                            <p class="balance-label">Saldo Disponível</p>
+                            <p class="balance-amount" id="dashboardBalance">R$ 0,00</p>
+                            <div class="wallet-actions">
+                                <button class="btn-primary" onclick="showDepositModal()">Depositar</button>
+                                <button class="btn-secondary" onclick="showWithdrawModal()">Sacar</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3>Estatísticas</h3>
+                        <div id="userStats"></div>
+                    </div>
+                    <div class="dashboard-card full-width">
+                        <h3>Transações Recentes</h3>
+                        <div id="recentTransactions"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modals -->
+    <div id="modalOverlay" class="modal-overlay" onclick="closeModal()"></div>
+    
+    <!-- Create Project Modal -->
+    <div id="createProjectModal" class="modal">
+        <div class="modal-content">
+            <h3>Criar Novo Projeto</h3>
+            <form id="createProjectForm" onsubmit="handleCreateProject(event)">
+                <div class="form-group">
+                    <label>Título</label>
+                    <input type="text" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label>Descrição</label>
+                    <textarea name="description" rows="4" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Valor (R$)</label>
+                    <input type="number" name="amount" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Prazo</label>
+                    <input type="date" name="deadline">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Criar Projeto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Deposit Modal -->
+    <div id="depositModal" class="modal">
+        <div class="modal-content">
+            <h3>Depositar Fundos</h3>
+            <form id="depositForm" onsubmit="handleDeposit(event)">
+                <div class="form-group">
+                    <label>Valor (R$)</label>
+                    <input type="number" name="amount" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Descrição</label>
+                    <input type="text" name="description" placeholder="Opcional">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Depositar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Withdraw Modal -->
+    <div id="withdrawModal" class="modal">
+        <div class="modal-content">
+            <h3>Sacar Fundos</h3>
+            <form id="withdrawForm" onsubmit="handleWithdraw(event)">
+                <div class="form-group">
+                    <label>Valor (R$)</label>
+                    <input type="number" name="amount" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Descrição</label>
+                    <input type="text" name="description" placeholder="Opcional">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Sacar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Project Details Modal -->
+    <div id="projectDetailsModal" class="modal">
+        <div class="modal-content modal-large">
+            <h3 id="projectTitle"></h3>
+            <div id="projectDetails"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
