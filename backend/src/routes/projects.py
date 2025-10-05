@@ -4,6 +4,9 @@ Projects routes
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
+from werkzeug.utils import secure_filename
+import os
+import json
 from src.models.database import db, Project, User, Review, Application
 
 projects_bp = Blueprint('projects', __name__)
@@ -334,6 +337,160 @@ def create_review(project_id):
         
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@projects_bp.route('/<project_id>/review-client', methods=['POST'])
+@jwt_required()
+def create_client_review(project_id):
+    """Freelancer reviews the client"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+
+        if user.user_type != 'freelancer':
+            return jsonify({'error': 'Apenas freelancers podem avaliar clientes'}), 403
+
+        project = Project.query.get(project_id)
+
+        if not project:
+            return jsonify({'error': 'Projeto não encontrado'}), 404
+
+        if project.freelancer_id != user_id:
+            return jsonify({'error': 'Você não está associado a este projeto'}), 403
+
+        if project.status != 'completed':
+            return jsonify({'error': 'Projeto precisa estar completo para avaliar o cliente'}), 400
+
+        existing_review = Review.query.filter_by(
+            project_id=project_id,
+            reviewer_id=user_id,
+            reviewed_id=project.client_id
+        ).first()
+
+        if existing_review:
+            return jsonify({'error': 'Você já avaliou este cliente'}), 400
+
+        data = request.get_json()
+
+        if 'rating' not in data or not (1 <= float(data['rating']) <= 5):
+            return jsonify({'error': 'Rating deve estar entre 1 e 5'}), 400
+
+        review = Review(
+            project_id=project_id,
+            reviewer_id=user_id,
+            reviewed_id=project.client_id,
+            rating=float(data['rating']),
+            comment=data.get('comment')
+        )
+
+        db.session.add(review)
+
+        client = User.query.get(project.client_id)
+        all_reviews = Review.query.filter_by(reviewed_id=project.client_id).all()
+        avg_rating = (sum([r.rating for r in all_reviews]) + float(data['rating'])) / (len(all_reviews) + 1)
+        client.reputation_score = round(avg_rating, 2)
+
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Avaliação do cliente criada com sucesso',
+            'review': review.to_dict()
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@projects_bp.route('/<project_id>/deliver', methods=['POST'])
+@jwt_required()
+def deliver_project(project_id):
+    """Freelancer delivers the project with files"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+
+        if user.user_type != 'freelancer':
+            return jsonify({'error': 'Apenas freelancers podem marcar projetos como entregues'}), 403
+
+        project = Project.query.get(project_id)
+
+        if not project:
+            return jsonify({'error': 'Projeto não encontrado'}), 404
+
+        if project.freelancer_id != user_id:
+            return jsonify({'error': 'Você não está associado a este projeto'}), 403
+
+        if project.status not in ['funded', 'in_progress']:
+            return jsonify({'error': 'Projeto não está em estado válido para entrega'}), 400
+
+        description = request.form.get('description')
+
+        if not description:
+            return jsonify({'error': 'Descrição da entrega é obrigatória'}), 400
+
+        upload_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads', project_id)
+        os.makedirs(upload_folder, exist_ok=True)
+
+        deliverables = []
+        files = request.files.getlist('files')
+
+        for file in files:
+            if file:
+                filename = secure_filename(file.filename)
+                file_path = os.path.join(upload_folder, filename)
+                file.save(file_path)
+
+                deliverables.append({
+                    'filename': filename,
+                    'url': f'/api/projects/{project_id}/files/{filename}',
+                    'size': os.path.getsize(file_path)
+                })
+
+        project.status = 'delivered'
+        if not hasattr(project, 'deliverables') or not project.deliverables:
+            project.deliverables = json.dumps({
+                'description': description,
+                'files': deliverables
+            })
+
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Projeto marcado como entregue',
+            'project': project.to_dict(),
+            'deliverables': deliverables
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@projects_bp.route('/<project_id>/files/<filename>', methods=['GET'])
+@jwt_required()
+def get_project_file(project_id, filename):
+    """Get uploaded project file"""
+    try:
+        from flask import send_file
+        from werkzeug.utils import secure_filename
+
+        user_id = get_jwt_identity()
+        project = Project.query.get(project_id)
+
+        if not project:
+            return jsonify({'error': 'Projeto não encontrado'}), 404
+
+        if project.client_id != user_id and project.freelancer_id != user_id:
+            return jsonify({'error': 'Sem permissão para acessar os arquivos deste projeto'}), 403
+
+        secure_name = secure_filename(filename)
+        file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads', project_id, secure_name)
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Arquivo não encontrado'}), 404
+
+        return send_file(file_path, as_attachment=True)
+
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 

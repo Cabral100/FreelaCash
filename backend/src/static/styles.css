@@ -564,6 +564,8 @@ nav a:hover {
     z-index: 1000;
     width: 90%;
     max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .modal.active {
@@ -579,6 +581,8 @@ nav a:hover {
     padding: 2rem;
     border-radius: 12px;
     border: 1px solid var(--border);
+    position: relative;
+    z-index: 1001;
 }
 
 .modal-content h3 {
@@ -665,3 +669,128 @@ nav a:hover {
 .mb-1 { margin-bottom: 0.5rem; }
 .mb-2 { margin-bottom: 1rem; }
 .mb-3 { margin-bottom: 1.5rem; }
+
+/* Notification */
+.notification {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    z-index: 10000;
+    min-width: 300px;
+    max-width: 500px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.notification.success {
+    border-color: var(--success);
+}
+
+.notification.error {
+    border-color: var(--error);
+}
+
+.notification.warning {
+    border-color: var(--warning);
+}
+
+.notification-message {
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+}
+
+.notification-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+}
+
+/* File upload area */
+.file-upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.file-upload-area:hover {
+    border-color: var(--primary-color);
+    background-color: rgba(0, 255, 136, 0.05);
+}
+
+.file-upload-area.dragover {
+    border-color: var(--primary-color);
+    background-color: rgba(0, 255, 136, 0.1);
+}
+
+.uploaded-file {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background-color: var(--background);
+    border-radius: 8px;
+    margin-top: 0.5rem;
+}
+
+.file-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.file-remove {
+    background: none;
+    border: none;
+    color: var(--error);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.deliverables-section {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: var(--background);
+    border-radius: 8px;
+}
+
+.deliverable-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background-color: var(--surface);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.deliverable-link {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.deliverable-link:hover {
+    text-decoration: underline;
+}
+
+.client-profile-link {
+    color: var(--primary-color);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.client-profile-link:hover {
+    color: var(--primary-dark);
+}

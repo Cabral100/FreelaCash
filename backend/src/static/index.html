@@ -340,6 +340,73 @@
         </div>
     </div>
 
+    <!-- Review Client Modal -->
+    <div id="reviewClientModal" class="modal">
+        <div class="modal-content">
+            <h3>Avaliar Cliente</h3>
+            <form id="reviewClientForm" onsubmit="handleCreateClientReview(event)">
+                <input type="hidden" id="reviewClientProjectId" name="project_id">
+                <div class="form-group">
+                    <label>Avaliação (1-5 estrelas)</label>
+                    <div class="star-rating">
+                        <input type="radio" name="rating" value="5" id="client_star5" required>
+                        <label for="client_star5">⭐⭐⭐⭐⭐</label>
+                        <input type="radio" name="rating" value="4" id="client_star4">
+                        <label for="client_star4">⭐⭐⭐⭐</label>
+                        <input type="radio" name="rating" value="3" id="client_star3">
+                        <label for="client_star3">⭐⭐⭐</label>
+                        <input type="radio" name="rating" value="2" id="client_star2">
+                        <label for="client_star2">⭐⭐</label>
+                        <input type="radio" name="rating" value="1" id="client_star1">
+                        <label for="client_star1">⭐</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Comentário</label>
+                    <textarea name="comment" rows="4" placeholder="Descreva sua experiência com o cliente"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Enviar Avaliação</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delivery Modal -->
+    <div id="deliveryModal" class="modal">
+        <div class="modal-content">
+            <h3>Marcar Projeto como Entregue</h3>
+            <form id="deliveryForm" onsubmit="handleProjectDelivery(event)">
+                <input type="hidden" id="deliveryProjectId" name="project_id">
+                <div class="form-group">
+                    <label>Descrição da Entrega</label>
+                    <textarea name="description" rows="3" placeholder="Descreva o que foi entregue" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Anexar Arquivos</label>
+                    <div class="file-upload-area" id="fileUploadArea">
+                        <p>Arraste arquivos aqui ou clique para selecionar</p>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Máximo: 10MB por arquivo</p>
+                    </div>
+                    <input type="file" id="deliveryFiles" multiple style="display: none;" accept="*/*">
+                    <div id="uploadedFilesList"></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Enviar Entrega</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Client Details Modal -->
+    <div id="clientDetailsModal" class="modal">
+        <div class="modal-content modal-large">
+            <div id="clientDetails"></div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

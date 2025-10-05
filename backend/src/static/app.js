@@ -16,20 +16,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check for saved token
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
-    
+
     if (savedToken && savedUser) {
         state.token = savedToken;
         state.user = JSON.parse(savedUser);
         updateAuthUI();
         loadUserData();
     }
-    
-    // Load initial page content
-    if (state.user) {
-        showPage('dashboard');
-    } else {
-        showPage('home');
-    }
+
+    // Always load initial page as home
+    showPage('home');
 });
 
 // Page Navigation
@@ -319,16 +315,50 @@ function displayProjectDetailsModal(project) {
     title.textContent = project.title;
 
     let actionsHTML = '';
+    let clientInfoHTML = '';
+    let deliverablesHTML = '';
 
     if (state.user) {
         if (state.user.user_type === 'freelancer' && project.status === 'open' && !project.freelancer_id) {
             actionsHTML = `<button class="btn-primary" onclick="showApplyModal('${project.project_id}')">Candidatar-se</button>`;
+            clientInfoHTML = `<p><strong>Cliente:</strong> <span class="client-profile-link" onclick="showClientDetails('${project.client_id}')">${project.client_name || 'N/A'}</span></p>`;
+        } else if (state.user.user_type === 'freelancer' && state.user.user_id === project.freelancer_id) {
+            clientInfoHTML = `<p><strong>Cliente:</strong> <span class="client-profile-link" onclick="showClientDetails('${project.client_id}')">${project.client_name || 'N/A'}</span></p>`;
+
+            if (project.status === 'funded' || project.status === 'in_progress') {
+                actionsHTML = `<button class="btn-primary" onclick="showDeliveryModal('${project.project_id}')">Marcar como Entregue</button>`;
+            } else if (project.status === 'completed') {
+                actionsHTML = `<button class="btn-primary" onclick="showClientReviewModal('${project.project_id}')">Avaliar Cliente</button>`;
+            }
         } else if (state.user.user_id === project.client_id) {
+            clientInfoHTML = `<p><strong>Cliente:</strong> ${project.client_name || 'N/A'}</p>`;
+
             if (project.status === 'open') {
                 actionsHTML = `<button class="btn-primary" onclick="viewApplications('${project.project_id}')">Ver Candidaturas</button>`;
             } else if (project.status === 'assigned') {
                 actionsHTML = `<button class="btn-primary" onclick="fundProject('${project.project_id}')">Financiar Projeto</button>`;
-            } else if (project.status === 'delivered' || project.status === 'funded' || project.status === 'in_progress') {
+            } else if (project.status === 'delivered') {
+                if (project.deliverables && project.deliverables.length > 0) {
+                    deliverablesHTML = `
+                        <div class="deliverables-section">
+                            <h4>Arquivos Entregues:</h4>
+                            ${project.deliverables.map(file => `
+                                <div class="deliverable-item">
+                                    <div class="file-info">
+                                        <span>📎</span>
+                                        <a href="${file.url}" target="_blank" class="deliverable-link">${file.filename}</a>
+                                        <span style="color: var(--text-secondary); font-size: 0.9rem;">(${file.size || 'N/A'})</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+                actionsHTML = `
+                    <button class="btn-primary" onclick="releasePayment('${project.project_id}')">Liberar Pagamento</button>
+                    <button class="btn-secondary" onclick="refundProject('${project.project_id}')">Solicitar Reembolso</button>
+                `;
+            } else if (project.status === 'funded' || project.status === 'in_progress') {
                 actionsHTML = `
                     <button class="btn-primary" onclick="releasePayment('${project.project_id}')">Liberar Pagamento</button>
                     <button class="btn-secondary" onclick="refundProject('${project.project_id}')">Solicitar Reembolso</button>
@@ -336,11 +366,9 @@ function displayProjectDetailsModal(project) {
             } else if (project.status === 'awaiting_review') {
                 actionsHTML = `<button class="btn-primary" onclick="showReviewModal('${project.project_id}')">Avaliar Freelancer</button>`;
             }
-        } else if (state.user.user_id === project.freelancer_id) {
-            if (project.status === 'funded' || project.status === 'in_progress') {
-                actionsHTML = `<button class="btn-primary" onclick="updateProjectStatus('${project.project_id}', 'delivered')">Marcar como Entregue</button>`;
-            }
         }
+    } else {
+        clientInfoHTML = `<p><strong>Cliente:</strong> ${project.client_name || 'N/A'}</p>`;
     }
 
     details.innerHTML = `
@@ -349,9 +377,10 @@ function displayProjectDetailsModal(project) {
             <p><strong>Descrição:</strong></p>
             <p>${project.description}</p>
             <p><strong>Valor:</strong> ${formatCurrency(project.amount)}</p>
-            <p><strong>Cliente:</strong> ${project.client_name || 'N/A'}</p>
+            ${clientInfoHTML}
             ${project.freelancer_name ? `<p><strong>Freelancer:</strong> ${project.freelancer_name}</p>` : ''}
             ${project.deadline ? `<p><strong>Prazo:</strong> ${formatDate(project.deadline)}</p>` : ''}
+            ${deliverablesHTML}
             <div class="modal-actions">
                 <button class="btn-secondary" onclick="closeModal()">Fechar</button>
                 ${actionsHTML}
@@ -881,7 +910,29 @@ function getTransactionTypeLabel(type) {
 }
 
 function showNotification(message, type = 'info') {
-    alert(message);
+    const overlay = document.createElement('div');
+    overlay.className = 'notification-overlay';
+
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'notification-message';
+    messageDiv.textContent = message;
+
+    const button = document.createElement('button');
+    button.className = 'btn-primary';
+    button.textContent = 'OK';
+    button.onclick = () => {
+        overlay.remove();
+        notification.remove();
+    };
+
+    notification.appendChild(messageDiv);
+    notification.appendChild(button);
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(notification);
 }
 
 function showApplyModal(projectId) {
@@ -1077,4 +1128,256 @@ async function handleCreateReview(event) {
     } catch (error) {
         showNotification('Erro ao conectar com o servidor', 'error');
     }
+}
+
+function showClientReviewModal(projectId) {
+    document.getElementById('reviewClientProjectId').value = projectId;
+    closeModal();
+    showModal('reviewClientModal');
+}
+
+async function handleCreateClientReview(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    const projectId = formData.get('project_id');
+
+    try {
+        const response = await fetch(`${API_URL}/projects/${projectId}/review-client`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${state.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                rating: parseFloat(formData.get('rating')),
+                comment: formData.get('comment')
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showNotification('Avaliação do cliente enviada com sucesso!', 'success');
+            closeModal();
+            form.reset();
+            loadProjects(state.currentFilter);
+        } else {
+            showNotification(data.error || 'Erro ao enviar avaliação', 'error');
+        }
+    } catch (error) {
+        showNotification('Erro ao conectar com o servidor', 'error');
+    }
+}
+
+let selectedFiles = [];
+
+function initFileUpload() {
+    const fileUploadArea = document.getElementById('fileUploadArea');
+    const fileInput = document.getElementById('deliveryFiles');
+    const uploadedFilesList = document.getElementById('uploadedFilesList');
+
+    if (!fileUploadArea || !fileInput) return;
+
+    fileUploadArea.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    fileUploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        fileUploadArea.classList.add('dragover');
+    });
+
+    fileUploadArea.addEventListener('dragleave', () => {
+        fileUploadArea.classList.remove('dragover');
+    });
+
+    fileUploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        fileUploadArea.classList.remove('dragover');
+        handleFileSelection(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        handleFileSelection(e.target.files);
+    });
+}
+
+function handleFileSelection(files) {
+    const uploadedFilesList = document.getElementById('uploadedFilesList');
+    const maxSize = 10 * 1024 * 1024;
+
+    Array.from(files).forEach(file => {
+        if (file.size > maxSize) {
+            showNotification(`Arquivo ${file.name} excede o tamanho máximo de 10MB`, 'error');
+            return;
+        }
+
+        selectedFiles.push(file);
+
+        const fileDiv = document.createElement('div');
+        fileDiv.className = 'uploaded-file';
+        fileDiv.innerHTML = `
+            <div class="file-info">
+                <span>📎</span>
+                <span>${file.name}</span>
+                <span style="color: var(--text-secondary); font-size: 0.9rem;">(${formatFileSize(file.size)})</span>
+            </div>
+            <button type="button" class="file-remove" onclick="removeFile(${selectedFiles.length - 1})">×</button>
+        `;
+        uploadedFilesList.appendChild(fileDiv);
+    });
+}
+
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    const uploadedFilesList = document.getElementById('uploadedFilesList');
+    uploadedFilesList.innerHTML = '';
+    selectedFiles.forEach((file, i) => {
+        const fileDiv = document.createElement('div');
+        fileDiv.className = 'uploaded-file';
+        fileDiv.innerHTML = `
+            <div class="file-info">
+                <span>📎</span>
+                <span>${file.name}</span>
+                <span style="color: var(--text-secondary); font-size: 0.9rem;">(${formatFileSize(file.size)})</span>
+            </div>
+            <button type="button" class="file-remove" onclick="removeFile(${i})">×</button>
+        `;
+        uploadedFilesList.appendChild(fileDiv);
+    });
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function showDeliveryModal(projectId) {
+    document.getElementById('deliveryProjectId').value = projectId;
+    selectedFiles = [];
+    document.getElementById('uploadedFilesList').innerHTML = '';
+    closeModal();
+    showModal('deliveryModal');
+    setTimeout(() => {
+        initFileUpload();
+    }, 100);
+}
+
+async function handleProjectDelivery(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    const projectId = formData.get('project_id');
+
+    const deliveryData = new FormData();
+    deliveryData.append('description', formData.get('description'));
+    selectedFiles.forEach((file, index) => {
+        deliveryData.append(`files`, file);
+    });
+
+    try {
+        const response = await fetch(`${API_URL}/projects/${projectId}/deliver`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${state.token}`
+            },
+            body: deliveryData
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showNotification('Projeto marcado como entregue! Aguarde a aprovação do cliente.', 'success');
+            closeModal();
+            form.reset();
+            selectedFiles = [];
+            loadProjects(state.currentFilter);
+        } else {
+            showNotification(data.error || 'Erro ao marcar projeto como entregue', 'error');
+        }
+    } catch (error) {
+        showNotification('Erro ao conectar com o servidor', 'error');
+    }
+}
+
+async function showClientDetails(clientId) {
+    try {
+        const response = await fetch(`${API_URL}/users/${clientId}`);
+
+        if (response.ok) {
+            const data = await response.json();
+            displayClientDetailsModal(data);
+        } else {
+            showNotification('Erro ao carregar detalhes do cliente', 'error');
+        }
+    } catch (error) {
+        showNotification('Erro ao conectar com o servidor', 'error');
+    }
+}
+
+function displayClientDetailsModal(data) {
+    const modal = document.getElementById('clientDetailsModal');
+    const details = document.getElementById('clientDetails');
+
+    const user = data.user;
+    const stats = data.statistics;
+    const reviews = data.recent_reviews || [];
+
+    let reviewsHTML = reviews.length > 0
+        ? reviews.map(review => `
+            <div style="padding: 15px; background: var(--card-bg); border-radius: 8px; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <strong>${review.reviewer_name || 'Freelancer'}</strong>
+                    <span>⭐ ${review.rating.toFixed(1)}</span>
+                </div>
+                <p style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 8px;">${review.project_title || ''}</p>
+                <p>${review.comment || 'Sem comentários'}</p>
+                <p style="color: var(--text-secondary); font-size: 0.8em; margin-top: 8px;">${formatDate(review.created_at)}</p>
+            </div>
+        `).join('')
+        : '<p style="color: var(--text-secondary);">Nenhuma avaliação ainda</p>';
+
+    details.innerHTML = `
+        <div style="margin-bottom: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+                <div>
+                    <h2 style="margin: 0 0 10px 0;">${user.name}</h2>
+                    <p style="color: var(--text-secondary); margin: 0;">${user.email}</p>
+                    ${user.bio ? `<p style="margin-top: 15px; line-height: 1.6;">${user.bio}</p>` : ''}
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 2em;">⭐ ${stats.average_rating.toFixed(1)}</div>
+                    <div style="color: var(--text-secondary);">${stats.total_reviews} avaliações</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px;">
+                <div style="text-align: center; padding: 15px; background: var(--card-bg); border-radius: 8px;">
+                    <div style="font-size: 2em; font-weight: bold; color: var(--primary-color);">${stats.total_projects}</div>
+                    <div style="color: var(--text-secondary);">Projetos Criados</div>
+                </div>
+                <div style="text-align: center; padding: 15px; background: var(--card-bg); border-radius: 8px;">
+                    <div style="font-size: 2em; font-weight: bold; color: var(--primary-color);">⭐${stats.average_rating.toFixed(1)}</div>
+                    <div style="color: var(--text-secondary);">Avaliação Média</div>
+                </div>
+                <div style="text-align: center; padding: 15px; background: var(--card-bg); border-radius: 8px;">
+                    <div style="font-size: 2em; font-weight: bold; color: var(--primary-color);">${user.reputation_score.toFixed(1)}</div>
+                    <div style="color: var(--text-secondary);">Reputação</div>
+                </div>
+            </div>
+
+            <h3 style="margin-bottom: 15px;">Avaliações Recentes</h3>
+            <div style="max-height: 400px; overflow-y: auto;">
+                ${reviewsHTML}
+            </div>
+
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn-secondary" onclick="closeModal()">Fechar</button>
+            </div>
+        </div>
+    `;
+
+    showModal('clientDetailsModal');
 }

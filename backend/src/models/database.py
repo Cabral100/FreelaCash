@@ -74,7 +74,7 @@ class EscrowWallet(db.Model):
 
 class Project(db.Model):
     __tablename__ = 'projects'
-    
+
     project_id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
     client_id = db.Column(db.String(36), db.ForeignKey('users.user_id'), nullable=False)
     freelancer_id = db.Column(db.String(36), db.ForeignKey('users.user_id'))
@@ -83,16 +83,25 @@ class Project(db.Model):
     amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='open')  # open, assigned, funded, in_progress, delivered, completed, disputed, cancelled
     deadline = db.Column(db.Date)
+    deliverables = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = db.Column(db.DateTime)
-    
+
     # Relationships
     transactions = db.relationship('Transaction', backref='project', cascade='all, delete-orphan')
     reviews = db.relationship('Review', backref='project', cascade='all, delete-orphan')
     applications = db.relationship('Application', backref='project', cascade='all, delete-orphan')
-    
+
     def to_dict(self):
+        import json
+        deliverables_data = None
+        if self.deliverables:
+            try:
+                deliverables_data = json.loads(self.deliverables)
+            except:
+                pass
+
         return {
             'project_id': self.project_id,
             'client_id': self.client_id,
@@ -106,7 +115,8 @@ class Project(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'completed_at': self.completed_at.isoformat() if self.completed_at else None,
             'client_name': self.client.name if self.client else None,
-            'freelancer_name': self.freelancer.name if self.freelancer else None
+            'freelancer_name': self.freelancer.name if self.freelancer else None,
+            'deliverables': deliverables_data.get('files', []) if deliverables_data else []
         }
 
 class Transaction(db.Model):
