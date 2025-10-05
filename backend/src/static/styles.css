@@ -573,7 +573,7 @@ nav a:hover {
 }
 
 .modal-large {
-    max-width: 700px;
+    max-width: 800px;
 }
 
 .modal-content {
@@ -583,6 +583,47 @@ nav a:hover {
     border: 1px solid var(--border);
     position: relative;
     z-index: 1001;
+}
+
+/* Scroll dentro dos modais */
+#applicationsList {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+#applicationsList::-webkit-scrollbar {
+    width: 8px;
+}
+
+#applicationsList::-webkit-scrollbar-track {
+    background: var(--background);
+    border-radius: 4px;
+}
+
+#applicationsList::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 4px;
+}
+
+#applicationsList::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-dark);
+}
+
+/* Garantir que modais fiquem acima de outros elementos */
+#freelancerDetailsModal .modal-content,
+#clientDetailsModal .modal-content {
+    z-index: 1002;
+}
+
+#freelancerDetailsModal.active,
+#clientDetailsModal.active {
+    z-index: 1001;
+}
+
+/* Quando modal de detalhes é aberto, garantir que overlay esteja correto */
+.modal-overlay.active ~ .modal.active {
+    z-index: 1000;
 }
 
 .modal-content h3 {

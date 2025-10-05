@@ -1044,7 +1044,7 @@ function displayApplicationsModal(projectId, applications) {
                                     <button class="btn-primary" onclick="acceptApplication('${projectId}', '${app.application_id}')" style="margin-right: 10px;">
                                         Aceitar
                                     </button>
-                                    <button class="btn-secondary" onclick="showFreelancerDetails('${app.freelancer_id}')">
+                                    <button class="btn-secondary" onclick="showFreelancerDetailsFromApplications('${app.freelancer_id}')">
                                         Ver Perfil
                                     </button>
                                 </div>
@@ -1061,6 +1061,22 @@ function displayApplicationsModal(projectId, applications) {
 
     closeModal();
     showModal('applicationsModal');
+}
+
+async function showFreelancerDetailsFromApplications(freelancerId) {
+    try {
+        const response = await fetch(`${API_URL}/users/${freelancerId}`);
+
+        if (response.ok) {
+            const data = await response.json();
+            closeModal();
+            displayFreelancerDetailsModal(data);
+        } else {
+            showNotification('Erro ao carregar detalhes do freelancer', 'error');
+        }
+    } catch (error) {
+        showNotification('Erro ao conectar com o servidor', 'error');
+    }
 }
 
 async function acceptApplication(projectId, applicationId) {
